@@ -112,6 +112,13 @@ var ASSET_PATHS={
   ball:['ball_8.webp','ball_8.jpeg','ball_8.jpg','ball_8.png'],
   paddle:['paddle_12x60.jpeg','paddle_12x60.jpg','paddle_12x60.png']
 };
+// Also try common subfolders if files aren't in the root (assets/, public/)
+(function(){
+  var bases=['','assets/','public/'];
+  var out={};
+  for(var k in ASSET_PATHS){ if(!ASSET_PATHS.hasOwnProperty(k)) continue; var list=ASSET_PATHS[k]; if(!Array.isArray(list)) list=[list]; var expanded=[]; for(var b=0;b<bases.length;b++){ for(var i=0;i<list.length;i++){ expanded.push(bases[b]+list[i]); } } out[k]=expanded; }
+  ASSET_PATHS=out;
+})();
 var Store={};            // raw images
 var Processed={};        // alpha-matted cutouts
 var DataMap={};          // imported overrides (data URLs)
@@ -192,6 +199,7 @@ function renderDebug(){ var lines=['Scene:'+scene,'Assets:']; Object.keys(Store)
 
 // -------------------- GAME STATE --------------------
 var scene=0; var player={x:120,y:396};
+function movePlayer(base){ if(!base) base=2.0; var s=(keys['shift']? base*1.5: base); if(keys['arrowright']||keys['d']) player.x+=s; if(keys['arrowleft']||keys['a']) player.x-=s; if(keys['arrowdown']||keys['s']) player.y+=s; if(keys['arrowup']||keys['w']) player.y-=s; player.x=Math.max(20,Math.min(W-20,player.x)); player.y=Math.max(260,Math.min(500,player.y)); }
 function resetTo(x,y){ player.x=x; player.y=y; }
 function setFontSmall(){ ctx.font='12px monospace'; }
 function setFontMed(){ ctx.font='14px monospace'; }
