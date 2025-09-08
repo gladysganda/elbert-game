@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Elbert x Gladys — Pixel Love Quest</title>
+  <title>Elbert Birthday Love Quest</title>
   <style>
     :root{ --ink:#eef2ff; --bg:#0a0b18; --line:#30346a; --heart:#ff6fae; }
     html,body{height:100%;margin:0;background:#0a0b18;color:var(--ink);font-family:ui-monospace,Menlo,Consolas,monospace}
-    .hud{position:fixed;inset:auto 12px 12px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;pointer-events:none;z-index:5}
+    .hud{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;pointer-events:none;z-index:5}
     .pill{pointer-events:auto;background:rgba(20,22,45,.85);border:1px solid var(--line);padding:8px 12px;border-radius:999px}
-    canvas{display:block;margin:auto;border:8px solid #222445;border-radius:14px;image-rendering:pixelated;background:linear-gradient(180deg,#0b0d1e,#0f1230);width:min(96vw,720px);height:auto}
+    canvas{display:block;margin:56px auto 0;border:8px solid #222445;border-radius:14px;image-rendering:pixelated;background:linear-gradient(180deg,#0b0d1e,#0f1230);width:min(96vw,720px);height:auto}
     .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:10}
     .card{width:min(740px,92vw);background:#11162e;border:1px solid var(--line);border-radius:14px;padding:18px}
     .row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
@@ -28,7 +28,7 @@
 <body>
   <div class="hud">
     <div class="pill" id="hint">Move: ⬅️⬆️⬇️➡️ / WASD · Interact: <b>E</b> · Next: <b>Space</b> · Sprint: <b>Shift</b> · Debug: <b>T</b></div>
-    <div class="pill">Elbert x Gladys — Pixel Love Quest</div>
+    <div class="pill">Elbert Birthday Love Quest</div>
   </div>
 
   <canvas id="game" width="720" height="540" aria-label="retro pixel game"></canvas>
@@ -203,38 +203,40 @@ function caption(txt){ smallText(txt,80,64); }
 function heart(x,y){ ctx.fillStyle='var(--heart)'; ctx.fillRect(x-2,y-2,4,2); ctx.fillRect(x-4,y,8,4); ctx.fillRect(x-3,y+4,6,3); ctx.fillRect(x-2,y+7,4,2); }
 
 // -------------------- TITLE --------------------
-function drawTitle(){ ctx.fillStyle='#0e1330'; ctx.fillRect(0,0,W,H); if(hasImg('splash')) drawImg('splash', W/2-160, 80, 320, 180, 'splash'); bigText('ELBERT x GLADYS', 190, 300); smallText('Pixel Love Quest', 270, 330); buttonText('Press  E  to start', 250, 370); if(keys['e']){ scene=1; resetTo(120,396); } }
+function drawTitle(){ ctx.fillStyle='#0e1330'; ctx.fillRect(0,0,W,H); if(hasImg('splash')) drawImg('splash', W/2-160, 80, 320, 180, 'splash'); bigText('ELBERT BIRTHDAY LOVE QUEST', 120, 300); smallText('Press  E  to start', 280, 330); if(keys['e']){ scene=1; resetTo(120,396); } }
 
-// -------------------- TRAM CHASE --------------------
-var tramPath=[{x:-200,y:360},{x:680,y:360},{x:680,y:300},{x:40,y:300},{x:40,y:420},{x:700,y:420},{x:-220,y:340}];
-var seg=0, segT=0; var tram={x:-200,y:360,speed:3.8};
-function advanceTram(){ var next=(seg+1)%tramPath.length; var a=tramPath[seg], b=tramPath[next]; var dx=b.x-a.x, dy=b.y-a.y; var len=Math.hypot(dx,dy)||1; var ux=dx/len, uy=dy/len; tram.x+=ux*tram.speed; tram.y+=uy*tram.speed; segT+=tram.speed; if(segT>=len){ seg=(seg+1)%tramPath.length; segT=0; tram.x=b.x; tram.y=b.y; } }
-function movePlayer(base){ if(!base) base=2.0; var s=(keys['shift']? base*1.5: base); if(keys['arrowright']||keys['d']) player.x+=s; if(keys['arrowleft']||keys['a']) player.x-=s; if(keys['arrowdown']||keys['s']) player.y+=s; if(keys['arrowup']||keys['w']) player.y-=s; player.x=Math.max(20,Math.min(W-20,player.x)); player.y=Math.max(260,Math.min(500,player.y)); }
-function updateTramScene(){ advanceTram(); movePlayer(2.3); var doorX=tram.x+130, doorY=tram.y; var caught=Math.hypot(player.x-doorX,player.y-doorY)<18; if(caught){ showText('Gotcha!','Gotcha, but I still won\'t be your girlfriend :p',function(){ scene=2; resetTo(120,396); }); } }
-function drawTramScene(){ ctx.fillStyle='#0f1b3f'; ctx.fillRect(0,0,W,320); ctx.fillStyle='#101226'; ctx.fillRect(0,320,W,220); drawImg('tram', tram.x, tram.y-28, 180,56,'tram'); if(hasImg('gladys')) drawImg('gladys', tram.x+56, tram.y-10, 32,32,'gladys'); if(hasImg('elbert')) drawImg('elbert', player.x-16, player.y-24, 32,32,'elbert'); smallText('Melbourne · 2017–2021 — Chase the tram! (Shift to sprint)', 140, 26); }
+// -------------------- TRAM CHASE (harder, random path) --------------------
+var tram={x:-200,y:360,speed:5.4};
+var target={x:600,y:360};
+function pickTarget(){ target.x = 40 + Math.random()*(W-80); target.y = 300 + Math.random()*140; }
+function updateTram(){ var dx=target.x-tram.x, dy=target.y-tram.y; var d=Math.hypot(dx,dy)||1; var ux=dx/d, uy=dy/d; tram.x += ux*tram.speed; tram.y += uy*tram.speed; if(d<8) pickTarget(); }
+function updateTramScene(){ updateTram(); movePlayer(2.6); var doorX=tram.x+130, doorY=tram.y; var caught=Math.hypot(player.x-doorX,player.y-doorY)<20; if(caught){ showText('Gotcha!','Gotcha, but I still won\'t be your girlfriend :p',function(){ scene=2; resetTo(120,396); }); } }
+function drawTramScene(){ ctx.fillStyle='#0f1b3f'; ctx.fillRect(0,0,W,320); ctx.fillStyle='#101226'; ctx.fillRect(0,320,W,220); drawImg('tram', tram.x, tram.y-28, 180,56,'tram'); if(hasImg('gladys')) drawImg('gladys', tram.x+56, tram.y-10, 32,32,'gladys'); if(hasImg('elbert')) drawImg('elbert', player.x-16, player.y-24, 32,32,'elbert'); smallText('Melbourne · 2017–2021 — Chase the tram! (Shift to sprint)', 120, 26); }
 
-// -------------------- 2022 MONTAGE --------------------
-var act=0, actTimer=0; // 0 car, 1 dinner, 2 drinks, 3 roadtrip, 4 lilies
-function updateMontage(){ actTimer++; if(keys[' ']||keys['space']){ keys[' ']=false; act++; actTimer=0; if(act>4){ act=0; scene=3; resetTo(120,396); } } }
-function drawCar(){ ctx.fillStyle='#08122a'; ctx.fillRect(0,0,W,H); drawImg('car', 60+(actTimer*2)%480, 360, 160,80,'car'); if(hasImg('elbert')) drawImg('elbert', 140+(actTimer*2)%480, 360, 32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', 180+(actTimer*2)%480, 360, 32,32,'gladys'); caption('2022 — Every morning you drove me from home to work. (Space)'); }
-function centerPanel(name){ if(hasImg(name)) drawImg(name, W/2-160, 260, 320,180,name); else drawPlaceholder(W/2-160,260,320,180,name); }
-function drawDinner(){ ctx.fillStyle='#0b0f24'; ctx.fillRect(0,0,W,H); centerPanel('dinner'); caption('Every evening you fetched me and we had dinner together. (Space)'); }
-function drawDrinks(){ ctx.fillStyle='#0a0c19'; ctx.fillRect(0,0,W,H); centerPanel('drinks'); var y=Math.sin(t/8)*3; if(hasImg('elbert')) drawImg('elbert', W/2-70, 360+y, 32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', W/2+38, 360-y, 32,32,'gladys'); caption('Sometimes we had late-night drinks under Melbourne lights. (Space)'); }
-function drawRoad(){ ctx.fillStyle='#0c142a'; ctx.fillRect(0,0,W,H); centerPanel('road'); caption('Weekends were our little roadtrips. (Space)'); }
-function drawLilies(){ ctx.fillStyle='#0a1024'; ctx.fillRect(0,0,W,H); if(hasImg('lilies')) drawImg('lilies', W/2-100, 260, 200,200,'lilies'); else drawPlaceholder(W/2-100,260,200,200,'lilies'); caption('One day, a bouquet of lilies waited at my door… (Space)'); }
-function drawMontage(){ switch(act){ case 0: drawCar(); break; case 1: drawDinner(); break; case 2: drawDrinks(); break; case 3: drawRoad(); break; case 4: drawLilies(); break; } }
+// -------------------- TIMELINE (2022): Car → Lilies (25 Feb) → Lorne (26 Feb) → Fish n Chips → Drinks --------------------
+function drawCar(){ ctx.fillStyle='#08122a'; ctx.fillRect(0,0,W,H); drawImg('car', 60+(t*2)%480, 360, 160,80,'car'); if(hasImg('elbert')) drawImg('elbert', 140+(t*2)%480, 360, 32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', 180+(t*2)%480, 360, 32,32,'gladys'); caption('2022 — Every morning you drove me from home to work. (Space)'); }
+function drawLilies(){ ctx.fillStyle='#0a1024'; ctx.fillRect(0,0,W,H); // simple room silhouette
+  ctx.fillStyle='#0c1230'; ctx.fillRect(W/2-200,240,400,220); ctx.fillStyle='#0e1640'; ctx.fillRect(W/2-40,250,80,180);
+  if(hasImg('lilies')) drawImg('lilies', W/2-60, 260, 120,160,'lilies'); caption('25 Feb 2022 — A bouquet of lilies waiting inside my home. (Space)'); }
+// Lorne scene with visible cliff marker
+var cliff={x:560,y:330,w:60,h:26};
+function drawLorne(){ if(hasImg('lorne')) drawImg('lorne',0,0,W,300,'lorne'); else { ctx.fillStyle='#0e204a'; ctx.fillRect(0,0,W,300); }
+  ctx.fillStyle='#0b152e'; ctx.fillRect(0,300,W,240);
+  // cliff marker
+  ctx.fillStyle='#3a8fd6'; ctx.fillRect(cliff.x-30,cliff.y-6,cliff.w,cliff.h); ctx.strokeStyle='#9ed1ff'; ctx.strokeRect(cliff.x-30,cliff.y-6,cliff.w,cliff.h); smallText('Cliff',cliff.x-10,cliff.y-12);
+  if(hasImg('elbert')) drawImg('elbert', player.x-16, player.y-24, 32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', player.x+10, player.y-24, 32,32,'gladys'); smallText('Walk onto the blue platform and press E', 180, 28); }
+function updateLorne(){ movePlayer(2.0); var onCliff = (player.x>cliff.x-40 && player.x<cliff.x+40 && player.y>cliff.y-20 && player.y<cliff.y+20); if(onCliff && keys['e']){ showText('26 February 2022','The day I said yes to being your girlfriend.',function(){ scene=5; resetTo(120,396); }); } }
 
-// -------------------- LORNE (26 Feb 2022) --------------------
-function updateLorne(){ movePlayer(2.0); if(Math.abs(player.x-560)<28 && Math.abs(player.y-330)<28){ if(keys['e']){ showText('26 February 2022','The day I said yes to being your girlfriend.',function(){ scene=4; resetTo(80,420); }); } } }
-function drawLorne(){ if(hasImg('lorne')) drawImg('lorne',0,0,W,300,'lorne'); else { ctx.fillStyle='#0e204a'; ctx.fillRect(0,0,W,300); } ctx.fillStyle='#0b152e'; ctx.fillRect(0,300,W,240); if(hasImg('elbert')) drawImg('elbert', player.x-16, player.y-24, 32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', player.x+10, player.y-24, 32,32,'gladys'); smallText('Walk to the cliff and press E', 240, 28); }
+function drawFishChips(){ ctx.fillStyle='#0b0f24'; ctx.fillRect(0,0,W,H); if(hasImg('dinner')) drawImg('dinner', W/2-180, 240, 360,220,'fish'); caption('26 Feb 2022 — After Lorne: fish & chips. (Space)'); }
+function drawDrinks(){ ctx.fillStyle='#0a0c19'; ctx.fillRect(0,0,W,H); if(hasImg('drinks')) drawImg('drinks', W/2-160, 260, 320,180,'drinks'); var y=Math.sin(t/8)*3; if(hasImg('elbert')) drawImg('elbert', W/2-70, 360+y, 32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', W/2+38, 360-y, 32,32,'gladys'); caption('26 Feb 2022 — Night drinks in Melbourne. (Space)'); }
 
 // -------------------- UPS & DOWNS BRIDGE --------------------
-function updateBridge(){ movePlayer(2.0); if(player.x>W-80){ scene=5; resetTo(60,300); } }
+function updateBridge(){ movePlayer(2.0); if(player.x>W-80){ scene=7; resetTo(60,300); } }
 function drawBridge(){ ctx.fillStyle='#111b34'; ctx.fillRect(0,0,W,260); ctx.fillStyle='#0d0f1e'; ctx.fillRect(0,260,W,280); for(var i=0;i<6;i++){ var hx=((i*120+(t*1.8))%(W+120))-60; ctx.fillStyle='#ff9f1c'; ctx.fillRect(hx,380+Math.sin((t+i)*0.1)*12,18,18);} ctx.fillStyle='#9aa7ff'; ctx.fillRect(40,420,W-80,6); if(hasImg('elbert')) drawImg('elbert', player.x-16,392,32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', player.x+12,392,32,32,'gladys'); buttonText('Hold → to cross together', 240, 30); }
 
 // -------------------- TENNIS CHALLENGE --------------------
 var rally=0, best=0; var target=5; var ball={x:W/2,y:350,vx:3,vy:-2}; var leftY=300, rightY=300; var PADDLE_H=80, PADDLE_W=12;
-function updateTennis(){ if(keys['arrowup']||keys['w']) leftY-=3; if(keys['arrowdown']||keys['s']) leftY+=3; leftY=Math.max(260,Math.min(460-PADDLE_H,leftY)); rightY += (ball.y - (rightY+PADDLE_H/2)) * 0.085; rightY=Math.max(260,Math.min(460-PADDLE_H,rightY)); ball.x+=ball.vx; ball.y+=ball.vy; if(ball.y<260||ball.y>460) ball.vy*=-1; if(ball.x<60 && ball.y>leftY && ball.y<leftY+PADDLE_H){ ball.vx=Math.abs(ball.vx)*1.05; rally++; best=Math.max(best,rally);} if(ball.x>W-60 && ball.y>rightY && ball.y<rightY+PADDLE_H){ ball.vx=-Math.abs(ball.vx)*1.05; rally++; best=Math.max(best,rally);} if(ball.x<0 || ball.x>W){ rally=0; ball={x:W/2,y:350,vx:(Math.random()>0.5?3:-3),vy:(Math.random()>0.5?-2:2)}; } if(best>=target){ showText('Nice rally!','Challenge complete. Ready for the secret last slide?',function(){ scene=6; resetTo(300,420); }); } }
+function updateTennis(){ if(keys['arrowup']||keys['w']) leftY-=3; if(keys['arrowdown']||keys['s']) leftY+=3; leftY=Math.max(260,Math.min(460-PADDLE_H,leftY)); rightY += (ball.y - (rightY+PADDLE_H/2)) * 0.085; rightY=Math.max(260,Math.min(460-PADDLE_H,rightY)); ball.x+=ball.vx; ball.y+=ball.vy; if(ball.y<260||ball.y>460) ball.vy*=-1; if(ball.x<60 && ball.y>leftY && ball.y<leftY+PADDLE_H){ ball.vx=Math.abs(ball.vx)*1.05; rally++; best=Math.max(best,rally);} if(ball.x>W-60 && ball.y>rightY && ball.y<rightY+PADDLE_H){ ball.vx=-Math.abs(ball.vx)*1.05; rally++; best=Math.max(best,rally);} if(ball.x<0 || ball.x>W){ rally=0; ball={x:W/2,y:350,vx:(Math.random()>0.5?3:-3),vy:(Math.random()>0.5?-2:2)}; } if(best>=target){ showText('Nice rally!','Challenge complete. Ready for the secret last slide?',function(){ scene=9; resetTo(300,420); }); } }
 function drawTennis(){ ctx.fillStyle='#0a1224'; ctx.fillRect(0,0,W,540); if(hasImg('court')) drawImg('court',0,120,W,400,'court'); ctx.fillStyle='#fff'; ctx.fillRect(48,leftY,PADDLE_W,PADDLE_H); ctx.fillRect(W-60,rightY,PADDLE_W,PADDLE_H); ctx.fillRect(ball.x-4,ball.y-4,8,8); buttonText('Please complete this challenge to unlock the secret last slide', 80, 140); smallText('Rally: '+rally+'  (Best: '+best+') — Target: '+target, 240, 160); }
 
 // -------------------- HOME + FINALE --------------------
@@ -242,16 +244,11 @@ var houseH=0, finalShown=false; function updateHome(){ if(houseH<140) houseH+=0.
 function drawHome(){ ctx.fillStyle='#0e1330'; ctx.fillRect(0,0,W,300); ctx.fillStyle='#0a0b18'; ctx.fillRect(0,300,W,240); var bx=360,by=420; ctx.fillStyle='#39427a'; ctx.fillRect(bx-50,by-houseH,100,houseH); ctx.fillStyle='#606bc1'; ctx.fillRect(bx-60,by-houseH,120,8); ctx.fillStyle='#9aa7ff'; ctx.fillRect(bx-34,by-houseH-28,68,28); if(hasImg('elbert')) drawImg('elbert',300,404,32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys',332,404,32,32,'gladys'); heart(332,388); buttonText('We are building a home — and soon we will call it HOME.', 110, 40); }
 function finale(){ finalShown=true; finalBox.style.display='flex'; confetti(); document.getElementById('finalLetter').textContent='Happy Birthday, Sayang.\n\nI am endlessly thankful for you — for how hard you work, for everything you have achieved, and for the man you keep growing into. I have known you for ten years, and every year I see a kinder, stronger, wiser you. I couldn\'t be prouder.\n\nMy wish is simple and big: may you always be completely healthy, truly happy, and may we become a happier version of us every day. May God make our path easy and keep blessing us. May our home be finished soon, smoothly and beautifully, and may every work you touch be crowned with success — because I believe your hard work will never betray you.\n\nThank you for choosing me through every season — for the drives, the dinners, the road trips, the quiet nights and the loud laughs. You are my first and, I pray, my last. I love you, now and always.'; }
 
-// -------------------- BOOT --------------------
+// -------------------- FLOW CONTROL --------------------
 var loadLayer=document.getElementById('loading');
-(function boot(){
-  preloadAssets(ASSET_PATHS)
-    .then(function(){ logLoad('\nAll images fetched. Creating auto cutouts (removing backgrounds)…'); return autoCutoutAll(); })
-    .then(function(){ loadLayer.style.display='none'; loop(); });
-})();
+(function boot(){ pickTarget(); preloadAssets(ASSET_PATHS).then(function(){ logLoad('\nAll images fetched. Creating auto cutouts (removing backgrounds)…'); return autoCutoutAll(); }).then(function(){ loadLayer.style.display='none'; loop(); }); })();
 
-// -------------------- LOOP --------------------
-function loop(){ t++; ctx.clearRect(0,0,W,H); switch(scene){ case 0: drawTitle(); break; case 1: updateTramScene(); drawTramScene(); break; case 2: updateMontage(); drawMontage(); break; case 3: updateLorne(); drawLorne(); break; case 4: updateBridge(); drawBridge(); break; case 5: updateTennis(); drawTennis(); break; case 6: updateHome(); drawHome(); break; } if(document.getElementById('debug').style.display==='block') renderDebug(); requestAnimationFrame(loop); }
+function loop(){ t++; ctx.clearRect(0,0,W,H); switch(scene){ case 0: drawTitle(); break; case 1: updateTramScene(); drawTramScene(); break; case 2: drawCar(); if(keys[' ']){ keys[' ']=false; scene=3; } break; case 3: drawLilies(); if(keys[' ']){ keys[' ']=false; scene=4; resetTo(520,340);} break; case 4: updateLorne(); drawLorne(); break; case 5: drawFishChips(); if(keys[' ']){ keys[' ']=false; scene=6; } break; case 6: drawDrinks(); if(keys[' ']){ keys[' ']=false; scene=7; resetTo(60,392);} break; case 7: updateBridge(); drawBridge(); break; case 8: /*unused*/ break; case 9: updateTennis(); drawTennis(); break; case 10: updateHome(); drawHome(); break; } if(scene===7 && player.x>W-82) { scene=9; resetTo(60,300); } if(scene===9 && best>=target){} if(scene===10){} if(document.getElementById('debug').style.display==='block') renderDebug(); requestAnimationFrame(loop); }
 
 // -------------------- TOUCH CONTROLS --------------------
 (function setupTouch(){ var isTouch='ontouchstart' in window || navigator.maxTouchPoints>0; var panel=document.getElementById('touch'); if(!isTouch) return; panel.style.display='block'; function bind(btn){ var key=btn.getAttribute('data-key'); var start=function(e){ e.preventDefault(); if(key) keys[key]=true; }; var end=function(e){ e.preventDefault(); if(key) keys[key]=false; }; btn.addEventListener('touchstart',start,{passive:false}); btn.addEventListener('touchend',end,{passive:false}); btn.addEventListener('touchcancel',end,{passive:false}); btn.addEventListener('mousedown',start); btn.addEventListener('mouseup',end); btn.addEventListener('mouseleave',end); } Array.prototype.forEach.call(panel.querySelectorAll('button[data-key]'), bind); })();
