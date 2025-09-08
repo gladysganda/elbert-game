@@ -18,7 +18,7 @@
     .final .inner{max-width:860px;padding:24px}
     .confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden}
     .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,18,.9);color:#fff;z-index:11}
-    .loading .box{padding:18px 20px;border:1px solid #3b3f7a;border-radius:12px;background:#121739;width:min(520px,92vw)}
+    .loading .box{padding:18px 20px;border:1px solid #3b3f7a;border-radius:12px;background:#121739;width:min(560px,92vw)}
     .progress{height:8px;background:#22274e;border-radius:999px;overflow:hidden;margin:8px 0 4px}
     .bar{height:100%;width:0;background:#9ef}
     .log{font-size:12px;max-height:160px;overflow:auto;opacity:.95;white-space:pre-wrap}
@@ -50,7 +50,7 @@
     <div class="confetti" id="confetti"></div>
   </div>
 
-    <div class="loading" id="loading">
+  <div class="loading" id="loading">
     <div class="box">
       <h3>Loading your pixel memories…</h3>
       <div class="progress"><div class="bar" id="bar"></div></div>
@@ -63,7 +63,7 @@
     </div>
   </div>
 
-    <div class="debug" id="debug"></div>
+  <div class="debug" id="debug"></div>
 
   <!-- Touch controls for phones -->
   <div id="touch" style="display:none; position:fixed; inset:auto 0 12px 0; pointer-events:none;">
@@ -89,13 +89,14 @@
 
 <script>
 (function(){ 'use strict';
+// -------------------- INPUT --------------------
 var canvas=document.getElementById('game');
 var ctx=canvas.getContext('2d');
 var W=canvas.width, H=canvas.height; var t=0; var keys={};
 window.addEventListener('keydown',function(e){var k=e.key.toLowerCase(); keys[k]=true; if(['arrowup','arrowdown','arrowleft','arrowright',' '].indexOf(k)>-1) e.preventDefault(); if(k==='t') toggleDebug();});
 window.addEventListener('keyup',function(e){ keys[e.key.toLowerCase()]=false; });
 
-// Assets as arrays of candidate filenames
+// -------------------- ASSETS --------------------
 var ASSET_PATHS={
   splash:['splash_photo.jpeg','splash_photo.jpg','splash_photo.png'],
   tram:['tram.jpeg','tram.jpg','tram.png'],
@@ -111,94 +112,87 @@ var ASSET_PATHS={
   ball:['ball_8.webp','ball_8.jpeg','ball_8.jpg','ball_8.png'],
   paddle:['paddle_12x60.jpeg','paddle_12x60.jpg','paddle_12x60.png']
 };
-var Store={};
-var DataMap = {}; // key -> dataURL (from Import)
-// Try to restore from localStorage (if available)
-try { var saved = localStorage.getItem('pixelLoveQuestAssets'); if(saved){ DataMap = JSON.parse(saved)||{}; } } catch(e){}
+var Store={};            // raw images
+var Processed={};        // alpha-matted cutouts
+var DataMap={};          // imported overrides (data URLs)
+try{ var saved = localStorage.getItem('pixelLoveQuestAssets'); if(saved) DataMap=JSON.parse(saved)||{}; }catch(e){}
 var loadUI={wrap:document.getElementById('loading'),bar:document.getElementById('bar'),log:document.getElementById('loadlog')};
 function logLoad(msg){ loadUI.log.textContent += "\n"+msg; }
 function setProgress(p){ loadUI.bar.style.width = (p*100).toFixed(1)+'%'; }
 
-function preloadAssets(paths){
-  var entries=Object.keys(paths); var done=0; setProgress(0); loadUI.log.textContent='';
-  var perAttemptTimeoutMs=6000; var cancel=false;
-  document.getElementById('startNow').onclick=function(){ cancel=true; logLoad('Bypassed loader by user. Starting with placeholders.'); setProgress(1); };
-  // Handle Import button
-  var importBtn=document.getElementById('importBtn'); var importInput=document.getElementById('importFiles');
+// File-import wiring (lets you use local photos instantly)
+var importBtn=document.getElementById('importBtn');
+var importInput=document.getElementById('importFiles');
+if(importBtn && importInput){
   importBtn.onclick=function(){ importInput.click(); };
-  importInput.onchange=function(ev){ var files=[].slice.call(ev.target.files||[]); if(!files.length) return; mapImportedFiles(files).then(function(mapped){
-      // Save to localStorage for persistence
-      try { localStorage.setItem('pixelLoveQuestAssets', JSON.stringify(DataMap)); } catch(e){}
-      logLoad('Imported '+Object.keys(mapped).length+' images. They will be used immediately.');
-    }); };
-  return Promise.all(entries.map(function(key){ return new Promise(function(res){
-    // Priority 1: imported dataURL
-    if(DataMap[key]){ var img1=new Image(); img1.onload=function(){ Store[key]={img:img1, ok:true, src:'(imported)'}; done++; setProgress(done/entries.length); logLoad('Loaded (imported): '+key); res(); }; img1.onerror=function(){ Store[key]={img:img1, ok:false, src:'(imported failed)'}; done++; setProgress(done/entries.length); logLoad('Failed (imported): '+key); res(); }; img1.src=DataMap[key]; return; }
-    // Else try file names
-    var list=paths[key]; if(!Array.isArray(list)) list=[list]; var i=0; function tryNext(){
-      if(cancel){ Store[key]={img:new Image(), ok:false, src:'(bypassed)'}; done++; setProgress(done/entries.length); return res(); }
-      var src=list[i]; var img=new Image(); img.crossOrigin='anonymous';
-      var settled=false; function finish(ok){ if(settled) return; settled=true; Store[key]={img:img, ok:ok, src:src}; done++; setProgress(done/entries.length); logLoad((ok?'Loaded: ':'Failed: ')+key+' ('+src+')'); return res(); }
-      var timer=setTimeout(function(){ img.onload=null; img.onerror=null; if(i<list.length-1){ i++; logLoad('Retry '+key+' with '+list[i]+' (timeout)'); tryNext(); } else { finish(false); } }, perAttemptTimeoutMs);
-      img.onload=function(){ clearTimeout(timer); finish(img.naturalWidth>0); };
-      img.onerror=function(){ clearTimeout(timer); if(i<list.length-1){ i++; logLoad('Retry '+key+' with '+list[i]); tryNext(); } else { finish(false); } };
-      img.src=src;
-    }
-    tryNext();
-  }); }));
+  importInput.onchange=function(ev){ var files=[].slice.call(ev.target.files||[]); if(!files.length) return; mapImportedFiles(files).then(function(){ try{localStorage.setItem('pixelLoveQuestAssets',JSON.stringify(DataMap));}catch(e){} logLoad('Imported '+files.length+' image(s). Refreshing…'); setTimeout(function(){ location.reload(); }, 350); }); };
 }
 
 function mapImportedFiles(files){
-  return new Promise(function(resolve){
-    var remaining=files.length; var matched=0; if(!remaining) return resolve({});
-    files.forEach(function(f){ var reader=new FileReader(); reader.onload=function(ev){ var url=ev.target.result; var base=f.name.toLowerCase(); var key=guessKeyFromFilename(base); if(key){ DataMap[key]=url; matched++; } remaining--; if(remaining===0) resolve(DataMap); }; reader.readAsDataURL(f); });
-  });
+  return new Promise(function(resolve){ var left=files.length; if(!left) return resolve(DataMap); files.forEach(function(f){ var r=new FileReader(); r.onload=function(e){ var key=guessKeyFromFilename((f.name||'').toLowerCase()); if(key) DataMap[key]=e.target.result; left--; if(left===0) resolve(DataMap); }; r.readAsDataURL(f); }); });
 }
 function guessKeyFromFilename(name){
   if(name.indexOf('tram')>-1) return 'tram';
   if(name.indexOf('gladys_48')>-1 || (name.indexOf('gladys')>-1 && name.indexOf('48')>-1)) return 'gladys';
   if(name.indexOf('elbert_48')>-1 || (name.indexOf('elbert')>-1 && name.indexOf('48')>-1)) return 'elbert';
   if(name.indexOf('car_side')>-1 || (name.indexOf('car')>-1 && name.indexOf('side')>-1)) return 'car';
-  if(name.indexOf('dinner_scene')>-1 || (name.indexOf('dinner')>-1)) return 'dinner';
-  if(name.indexOf('drinks_scene')>-1 || (name.indexOf('drink')>-1)) return 'drinks';
-  if(name.indexOf('road_scene')>-1 || (name.indexOf('road')>-1)) return 'road';
-  if(name.indexOf('lilies_door')>-1 || (name.indexOf('lily')>-1 || name.indexOf('lilies')>-1)) return 'lilies';
+  if(name.indexOf('dinner_scene')>-1 || name.indexOf('dinner')>-1) return 'dinner';
+  if(name.indexOf('drinks_scene')>-1 || name.indexOf('drink')>-1) return 'drinks';
+  if(name.indexOf('road_scene')>-1 || name.indexOf('road')>-1) return 'road';
+  if(name.indexOf('lilies_door')>-1 || name.indexOf('lily')>-1 || name.indexOf('lilies')>-1) return 'lilies';
   if(name.indexOf('lorne_bg')>-1 || name.indexOf('lorne')>-1) return 'lorne';
-  if(name.indexOf('tennis_court')>-1 || (name.indexOf('court')>-1)) return 'court';
+  if(name.indexOf('tennis_court')>-1 || name.indexOf('court')>-1) return 'court';
   if(name.indexOf('paddle_12x60')>-1 || name.indexOf('paddle')>-1) return 'paddle';
   if(name.indexOf('ball_8')>-1 || name.indexOf('ball')>-1) return 'ball';
   if(name.indexOf('splash_photo')>-1 || name.indexOf('splash')>-1) return 'splash';
   return null;
 }
-      var src=list[i]; var img=new Image(); img.crossOrigin='anonymous';
-      var settled=false; function finish(ok){ if(settled) return; settled=true; Store[key]={img:img, ok:ok, src:src}; done++; setProgress(done/entries.length); logLoad((ok?'Loaded: ':'Failed: ')+key+' ('+src+')'); return res(); }
-      var timer=setTimeout(function(){ img.onload=null; img.onerror=null; if(i<list.length-1){ i++; logLoad('Retry '+key+' with '+list[i]+' (timeout)'); tryNext(); } else { finish(false); } }, perAttemptTimeoutMs);
-      img.onload=function(){ clearTimeout(timer); finish(img.naturalWidth>0); };
-      img.onerror=function(){ clearTimeout(timer); if(i<list.length-1){ i++; logLoad('Retry '+key+' with '+list[i]); tryNext(); } else { finish(false); } };
-      img.src=src;
-    }
-    tryNext();
-  }); }));
+
+function preloadAssets(paths){
+  var keys=Object.keys(paths); setProgress(0); loadUI.log.textContent='';
+  return new Promise(function(resolve){
+    var done=0; function doneOne(){ done++; setProgress(done/Math.max(1,keys.length)); if(done>=keys.length) resolve(); }
+    keys.forEach(function(key){
+      // Imported override first
+      if(DataMap[key]){ var im=new Image(); im.onload=function(){ Store[key]={img:im,ok:true,src:'(imported)'}; logLoad('Loaded (imported): '+key); doneOne(); }; im.onerror=function(){ Store[key]={img:im,ok:false,src:'(imported fail)'}; logLoad('Failed (imported): '+key); doneOne(); }; im.src=DataMap[key]; return; }
+      // Else try candidates sequentially
+      var list=Array.isArray(paths[key])?paths[key]:[paths[key]]; var idx=0;
+      (function loadNext(){ var src=list[idx]; var img=new Image(); img.crossOrigin='anonymous'; img.onload=function(){ Store[key]={img:img,ok:true,src:src}; logLoad('Loaded: '+key+' ('+src+')'); doneOne(); }; img.onerror=function(){ idx++; if(idx<list.length){ logLoad('Retry '+key+' with '+list[idx]); loadNext(); } else { Store[key]={img:new Image(),ok:false,src:'(missing)'}; logLoad('Missing: '+key); doneOne(); } }; img.src=src; })();
+    });
+  });
 }
 
-function hasImg(name){ var a=Store[name]; return !!(a && a.ok && a.img.complete && a.img.naturalWidth>0); }
-function drawImg(name,x,y,w,h,label){ var a=Store[name]; if(hasImg(name)) ctx.drawImage(a.img,x,y,w,h); else drawPlaceholder(x,y,w,h,label||name); }
-function drawPlaceholder(x,y,w,h,label){ ctx.fillStyle='rgba(255,255,255,.08)'; ctx.fillRect(x,y,w,h); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.strokeRect(x+0.5,y+0.5,w-1,h-1); smallText(label, x+6, y+18); }
+// -------------------- AUTO CUTOUT --------------------
+function autoCutoutAll(){
+  var keys=Object.keys(Store); var i=0, done=0; setProgress(0);
+  return new Promise(function(resolve){
+    function next(){ if(i>=keys.length) return resolve(); var k=keys[i++]; var rec=Store[k]; if(!rec||!rec.img||rec.ok===false){ done++; setProgress(done/keys.length); return next(); }
+      autoCutout(rec.img,{maxW:640,thr:32,feather:2}).then(function(out){ Processed[k]={img:out,ok:true,src:'(cutout)'}; done++; logLoad('Cutout ✓ '+k); setProgress(done/keys.length); next(); }).catch(function(){ Processed[k]=rec; done++; logLoad('Cutout ✗ '+k+' (keeping original)'); setProgress(done/keys.length); next(); }); }
+    next();
+  });
+}
+function autoCutout(img,opts){ opts=opts||{}; var maxW=opts.maxW||512, thr=opts.thr||28, feather=opts.feather||2; return new Promise(function(resolve,reject){ var w=img.naturalWidth, h=img.naturalHeight, s=1; if(w>maxW){ s=maxW/w; w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s)); } var c=document.createElement('canvas'); c.width=w; c.height=h; var x=c.getContext('2d'); x.drawImage(img,0,0,w,h); try{ var d=x.getImageData(0,0,w,h); var a=d.data; var samples=[], step=Math.max(1,Math.floor(Math.min(w,h)/80)); for(var ix=0;ix<w;ix+=step){ var p1=(0*w+ix)*4, p2=((h-1)*w+ix)*4; samples.push([a[p1],a[p1+1],a[p1+2]]); samples.push([a[p2],a[p2+1],a[p2+2]]);} for(var iy=0;iy<h;iy+=step){ var q1=(iy*w+0)*4, q2=(iy*w+(w-1))*4; samples.push([a[q1],a[q1+1],a[q1+2]]); samples.push([a[q2],a[q2+1],a[q2+2]]);} var m=[0,0,0]; for(var s2=0;s2<samples.length;s2++){ m[0]+=samples[s2][0]; m[1]+=samples[s2][1]; m[2]+=samples[s2][2]; } m[0]/=samples.length; m[1]/=samples.length; m[2]/=samples.length; var mask=new Uint8ClampedArray(w*h), k=0, thr2=thr*thr; for(var y=0;y<h;y++){ for(var x2=0;x2<w;x2++){ var p=(y*w+x2)*4; var dr=a[p]-m[0], dg=a[p+1]-m[1], db=a[p+2]-m[2]; var dist=dr*dr+dg*dg+db*db; mask[k++]=(dist>thr2)?255:0; } } if(feather>0) mask=blurMask(mask,w,h,feather); for(var i2=0;i2<w*h;i2++){ a[i2*4+3]=mask[i2]; } x.putImageData(d,0,0); var out=new Image(); out.onload=function(){ resolve(out); }; out.onerror=function(){ reject(new Error('cutout load fail')); }; out.src=c.toDataURL('image/png'); }catch(e){ reject(e); } }); }
+function blurMask(mask,w,h,r){ var tmp=new Uint8ClampedArray(mask.length); for(var y=0;y<h;y++){ var acc=0; for(var x=0;x<w;x++){ var i=y*w+x; acc+=mask[i]; if(x>=r) acc-=mask[y*w+(x-r)]; tmp[i]=acc/Math.min(x+1,r); } } var out=new Uint8ClampedArray(mask.length); for(var x2=0;x2<w;x2++){ var acc2=0; for(var y2=0;y2<h;y2++){ var j=y2*w+x2; acc2+=tmp[j]; if(y2>=r) acc2-=tmp[(y2-r)*w+x2]; out[j]=acc2/Math.min(y2+1,r); } } return out; }
 
+function hasImg(name){ var a=Processed[name]||Store[name]; return !!(a && a.ok!==false && a.img && a.img.complete && a.img.naturalWidth>0); }
+function drawImg(name,x,y,w,h,label){ var a=Processed[name]||Store[name]; if(hasImg(name)) ctx.drawImage(a.img,x,y,w,h); else drawPlaceholder(x,y,w,h,label||name); }
+function drawPlaceholder(x,y,w,h,label){ ctx.fillStyle='rgba(255,255,255,.08)'; ctx.fillRect(x,y,w,h); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.strokeRect(x+0.5,y+0.5,w-1,h-1); ctx.fillStyle='#fff'; ctx.font='12px monospace'; ctx.fillText(label,x+6,y+18); }
+
+// -------------------- UI helpers --------------------
 var modal=document.getElementById('modal');
 var mTitle=document.getElementById('mTitle');
 var mBody=document.getElementById('mBody');
 var mOk=document.getElementById('mOk');
 function showText(title,text,onClose){ mTitle.textContent=title; mBody.textContent=text; modal.style.display='flex'; mOk.onclick=function(){ modal.style.display='none'; if(onClose) onClose(); }; }
 var finalBox=document.getElementById('final');
-function confetti(){ var box=document.getElementById('confetti'); for(var i=0;i<120;i++){ var d=document.createElement('div'); d.style.position='absolute'; d.style.left=(Math.random()*100)+'%'; d.style.top='-10px'; d.style.width='6px'; d.style.height='10px'; d.style.background='hsl('+(Math.floor(Math.random()*360))+',80%,65%)'; d.animate([{transform:'translateY(-10px)'},{transform:'translateY(110vh)'}],{duration:2200+Math.random()*2200}); (function(dd){ setTimeout(function(){ dd.remove(); },4600); })(d); box.appendChild(d);} }
+function confetti(){ var box=document.getElementById('confetti'); for(var i=0;i<140;i++){ var d=document.createElement('div'); d.style.position='absolute'; d.style.left=(Math.random()*100)+'%'; d.style.top='-10px'; d.style.width='6px'; d.style.height='10px'; d.style.background='hsl('+(Math.floor(Math.random()*360))+',80%,65%)'; d.animate([{transform:'translateY(-10px)'},{transform:'translateY(110vh)'}],{duration:2200+Math.random()*2200}); (function(dd){ setTimeout(function(){ dd.remove(); },4600); })(d); box.appendChild(d);} }
 var debugBox=document.getElementById('debug');
 function toggleDebug(){ debugBox.style.display=(debugBox.style.display==='block')?'none':'block'; renderDebug(); }
-function renderDebug(){ var lines=['Scene:'+scene,'Assets:']; Object.keys(Store).forEach(function(k){ var v=Store[k]; lines.push('- '+k+': '+(v.ok?'OK':'MISSING')+' ('+v.src+')'); }); debugBox.innerText=lines.join('\n'); }
+function renderDebug(){ var lines=['Scene:'+scene,'Assets:']; Object.keys(Store).forEach(function(k){ var v=Processed[k]||Store[k]; lines.push('- '+k+': '+(v&&v.img&&v.img.naturalWidth>0?'OK':'MISSING')); }); debugBox.innerText=lines.join('\n'); }
 
+// -------------------- GAME STATE --------------------
 var scene=0; var player={x:120,y:396};
 function resetTo(x,y){ player.x=x; player.y=y; }
-
 function setFontSmall(){ ctx.font='12px monospace'; }
 function setFontMed(){ ctx.font='14px monospace'; }
 function setFontBig(){ ctx.font='20px monospace'; }
@@ -208,8 +202,10 @@ function bigText(txt,x,y){ setFontBig(); var w=ctx.measureText(txt).width; ctx.f
 function caption(txt){ smallText(txt,80,64); }
 function heart(x,y){ ctx.fillStyle='var(--heart)'; ctx.fillRect(x-2,y-2,4,2); ctx.fillRect(x-4,y,8,4); ctx.fillRect(x-3,y+4,6,3); ctx.fillRect(x-2,y+7,4,2); }
 
+// -------------------- TITLE --------------------
 function drawTitle(){ ctx.fillStyle='#0e1330'; ctx.fillRect(0,0,W,H); if(hasImg('splash')) drawImg('splash', W/2-160, 80, 320, 180, 'splash'); bigText('ELBERT x GLADYS', 190, 300); smallText('Pixel Love Quest', 270, 330); buttonText('Press  E  to start', 250, 370); if(keys['e']){ scene=1; resetTo(120,396); } }
 
+// -------------------- TRAM CHASE --------------------
 var tramPath=[{x:-200,y:360},{x:680,y:360},{x:680,y:300},{x:40,y:300},{x:40,y:420},{x:700,y:420},{x:-220,y:340}];
 var seg=0, segT=0; var tram={x:-200,y:360,speed:3.8};
 function advanceTram(){ var next=(seg+1)%tramPath.length; var a=tramPath[seg], b=tramPath[next]; var dx=b.x-a.x, dy=b.y-a.y; var len=Math.hypot(dx,dy)||1; var ux=dx/len, uy=dy/len; tram.x+=ux*tram.speed; tram.y+=uy*tram.speed; segT+=tram.speed; if(segT>=len){ seg=(seg+1)%tramPath.length; segT=0; tram.x=b.x; tram.y=b.y; } }
@@ -217,6 +213,7 @@ function movePlayer(base){ if(!base) base=2.0; var s=(keys['shift']? base*1.5: b
 function updateTramScene(){ advanceTram(); movePlayer(2.3); var doorX=tram.x+130, doorY=tram.y; var caught=Math.hypot(player.x-doorX,player.y-doorY)<18; if(caught){ showText('Gotcha!','Gotcha, but I still won\'t be your girlfriend :p',function(){ scene=2; resetTo(120,396); }); } }
 function drawTramScene(){ ctx.fillStyle='#0f1b3f'; ctx.fillRect(0,0,W,320); ctx.fillStyle='#101226'; ctx.fillRect(0,320,W,220); drawImg('tram', tram.x, tram.y-28, 180,56,'tram'); if(hasImg('gladys')) drawImg('gladys', tram.x+56, tram.y-10, 32,32,'gladys'); if(hasImg('elbert')) drawImg('elbert', player.x-16, player.y-24, 32,32,'elbert'); smallText('Melbourne · 2017–2021 — Chase the tram! (Shift to sprint)', 140, 26); }
 
+// -------------------- 2022 MONTAGE --------------------
 var act=0, actTimer=0; // 0 car, 1 dinner, 2 drinks, 3 roadtrip, 4 lilies
 function updateMontage(){ actTimer++; if(keys[' ']||keys['space']){ keys[' ']=false; act++; actTimer=0; if(act>4){ act=0; scene=3; resetTo(120,396); } } }
 function drawCar(){ ctx.fillStyle='#08122a'; ctx.fillRect(0,0,W,H); drawImg('car', 60+(actTimer*2)%480, 360, 160,80,'car'); if(hasImg('elbert')) drawImg('elbert', 140+(actTimer*2)%480, 360, 32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', 180+(actTimer*2)%480, 360, 32,32,'gladys'); caption('2022 — Every morning you drove me from home to work. (Space)'); }
@@ -227,33 +224,37 @@ function drawRoad(){ ctx.fillStyle='#0c142a'; ctx.fillRect(0,0,W,H); centerPanel
 function drawLilies(){ ctx.fillStyle='#0a1024'; ctx.fillRect(0,0,W,H); if(hasImg('lilies')) drawImg('lilies', W/2-100, 260, 200,200,'lilies'); else drawPlaceholder(W/2-100,260,200,200,'lilies'); caption('One day, a bouquet of lilies waited at my door… (Space)'); }
 function drawMontage(){ switch(act){ case 0: drawCar(); break; case 1: drawDinner(); break; case 2: drawDrinks(); break; case 3: drawRoad(); break; case 4: drawLilies(); break; } }
 
+// -------------------- LORNE (26 Feb 2022) --------------------
 function updateLorne(){ movePlayer(2.0); if(Math.abs(player.x-560)<28 && Math.abs(player.y-330)<28){ if(keys['e']){ showText('26 February 2022','The day I said yes to being your girlfriend.',function(){ scene=4; resetTo(80,420); }); } } }
 function drawLorne(){ if(hasImg('lorne')) drawImg('lorne',0,0,W,300,'lorne'); else { ctx.fillStyle='#0e204a'; ctx.fillRect(0,0,W,300); } ctx.fillStyle='#0b152e'; ctx.fillRect(0,300,W,240); if(hasImg('elbert')) drawImg('elbert', player.x-16, player.y-24, 32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', player.x+10, player.y-24, 32,32,'gladys'); smallText('Walk to the cliff and press E', 240, 28); }
 
+// -------------------- UPS & DOWNS BRIDGE --------------------
 function updateBridge(){ movePlayer(2.0); if(player.x>W-80){ scene=5; resetTo(60,300); } }
 function drawBridge(){ ctx.fillStyle='#111b34'; ctx.fillRect(0,0,W,260); ctx.fillStyle='#0d0f1e'; ctx.fillRect(0,260,W,280); for(var i=0;i<6;i++){ var hx=((i*120+(t*1.8))%(W+120))-60; ctx.fillStyle='#ff9f1c'; ctx.fillRect(hx,380+Math.sin((t+i)*0.1)*12,18,18);} ctx.fillStyle='#9aa7ff'; ctx.fillRect(40,420,W-80,6); if(hasImg('elbert')) drawImg('elbert', player.x-16,392,32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys', player.x+12,392,32,32,'gladys'); buttonText('Hold → to cross together', 240, 30); }
 
+// -------------------- TENNIS CHALLENGE --------------------
 var rally=0, best=0; var target=5; var ball={x:W/2,y:350,vx:3,vy:-2}; var leftY=300, rightY=300; var PADDLE_H=80, PADDLE_W=12;
 function updateTennis(){ if(keys['arrowup']||keys['w']) leftY-=3; if(keys['arrowdown']||keys['s']) leftY+=3; leftY=Math.max(260,Math.min(460-PADDLE_H,leftY)); rightY += (ball.y - (rightY+PADDLE_H/2)) * 0.085; rightY=Math.max(260,Math.min(460-PADDLE_H,rightY)); ball.x+=ball.vx; ball.y+=ball.vy; if(ball.y<260||ball.y>460) ball.vy*=-1; if(ball.x<60 && ball.y>leftY && ball.y<leftY+PADDLE_H){ ball.vx=Math.abs(ball.vx)*1.05; rally++; best=Math.max(best,rally);} if(ball.x>W-60 && ball.y>rightY && ball.y<rightY+PADDLE_H){ ball.vx=-Math.abs(ball.vx)*1.05; rally++; best=Math.max(best,rally);} if(ball.x<0 || ball.x>W){ rally=0; ball={x:W/2,y:350,vx:(Math.random()>0.5?3:-3),vy:(Math.random()>0.5?-2:2)}; } if(best>=target){ showText('Nice rally!','Challenge complete. Ready for the secret last slide?',function(){ scene=6; resetTo(300,420); }); } }
 function drawTennis(){ ctx.fillStyle='#0a1224'; ctx.fillRect(0,0,W,540); if(hasImg('court')) drawImg('court',0,120,W,400,'court'); ctx.fillStyle='#fff'; ctx.fillRect(48,leftY,PADDLE_W,PADDLE_H); ctx.fillRect(W-60,rightY,PADDLE_W,PADDLE_H); ctx.fillRect(ball.x-4,ball.y-4,8,8); buttonText('Please complete this challenge to unlock the secret last slide', 80, 140); smallText('Rally: '+rally+'  (Best: '+best+') — Target: '+target, 240, 160); }
 
+// -------------------- HOME + FINALE --------------------
 var houseH=0, finalShown=false; function updateHome(){ if(houseH<140) houseH+=0.6; else if(!finalShown){ finale(); } }
 function drawHome(){ ctx.fillStyle='#0e1330'; ctx.fillRect(0,0,W,300); ctx.fillStyle='#0a0b18'; ctx.fillRect(0,300,W,240); var bx=360,by=420; ctx.fillStyle='#39427a'; ctx.fillRect(bx-50,by-houseH,100,houseH); ctx.fillStyle='#606bc1'; ctx.fillRect(bx-60,by-houseH,120,8); ctx.fillStyle='#9aa7ff'; ctx.fillRect(bx-34,by-houseH-28,68,28); if(hasImg('elbert')) drawImg('elbert',300,404,32,32,'elbert'); if(hasImg('gladys')) drawImg('gladys',332,404,32,32,'gladys'); heart(332,388); buttonText('We are building a home — and soon we will call it HOME.', 110, 40); }
 function finale(){ finalShown=true; finalBox.style.display='flex'; confetti(); document.getElementById('finalLetter').textContent='Happy Birthday, Sayang.\n\nI am endlessly thankful for you — for how hard you work, for everything you have achieved, and for the man you keep growing into. I have known you for ten years, and every year I see a kinder, stronger, wiser you. I couldn\'t be prouder.\n\nMy wish is simple and big: may you always be completely healthy, truly happy, and may we become a happier version of us every day. May God make our path easy and keep blessing us. May our home be finished soon, smoothly and beautifully, and may every work you touch be crowned with success — because I believe your hard work will never betray you.\n\nThank you for choosing me through every season — for the drives, the dinners, the road trips, the quiet nights and the loud laughs. You are my first and, I pray, my last. I love you, now and always.'; }
 
+// -------------------- BOOT --------------------
 var loadLayer=document.getElementById('loading');
-(function boot(){ preloadAssets(ASSET_PATHS).then(function(){ loadLayer.style.display='none'; loop(); }); })();
+(function boot(){
+  preloadAssets(ASSET_PATHS)
+    .then(function(){ logLoad('\nAll images fetched. Creating auto cutouts (removing backgrounds)…'); return autoCutoutAll(); })
+    .then(function(){ loadLayer.style.display='none'; loop(); });
+})();
 
+// -------------------- LOOP --------------------
 function loop(){ t++; ctx.clearRect(0,0,W,H); switch(scene){ case 0: drawTitle(); break; case 1: updateTramScene(); drawTramScene(); break; case 2: updateMontage(); drawMontage(); break; case 3: updateLorne(); drawLorne(); break; case 4: updateBridge(); drawBridge(); break; case 5: updateTennis(); drawTennis(); break; case 6: updateHome(); drawHome(); break; } if(document.getElementById('debug').style.display==='block') renderDebug(); requestAnimationFrame(loop); }
 
-// ---- Touch controls binding ----
-(function setupTouch(){ var isTouch='ontouchstart' in window || navigator.maxTouchPoints>0; var panel=document.getElementById('touch'); if(!isTouch) return; panel.style.display='block';
-  function bind(btn){ var key=btn.getAttribute('data-key'); var active=false; var start=function(e){ e.preventDefault(); active=true; if(key) keys[key]=true; }; var end=function(e){ e.preventDefault(); active=false; if(key) keys[key]=false; };
-    btn.addEventListener('touchstart',start,{passive:false}); btn.addEventListener('touchend',end,{passive:false}); btn.addEventListener('touchcancel',end,{passive:false});
-    btn.addEventListener('mousedown',start); btn.addEventListener('mouseup',end); btn.addEventListener('mouseleave',end);
-  }
-  Array.prototype.forEach.call(panel.querySelectorAll('button[data-key]'), bind);
-})();
+// -------------------- TOUCH CONTROLS --------------------
+(function setupTouch(){ var isTouch='ontouchstart' in window || navigator.maxTouchPoints>0; var panel=document.getElementById('touch'); if(!isTouch) return; panel.style.display='block'; function bind(btn){ var key=btn.getAttribute('data-key'); var start=function(e){ e.preventDefault(); if(key) keys[key]=true; }; var end=function(e){ e.preventDefault(); if(key) keys[key]=false; }; btn.addEventListener('touchstart',start,{passive:false}); btn.addEventListener('touchend',end,{passive:false}); btn.addEventListener('touchcancel',end,{passive:false}); btn.addEventListener('mousedown',start); btn.addEventListener('mouseup',end); btn.addEventListener('mouseleave',end); } Array.prototype.forEach.call(panel.querySelectorAll('button[data-key]'), bind); })();
 
 })();
 </script>
